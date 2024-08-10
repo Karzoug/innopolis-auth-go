@@ -2,7 +2,7 @@ POST http://localhost:8081/login
 
 {
     "username":"qq@qq.qq",
-    "password":"1231"
+    "password":"123"
 }
 
 ### 
@@ -15,4 +15,12 @@ POST http://localhost:8081/register
 
 #### 
 
-GET http://localhost:8081/build
+POST http://localhost:8081/refresh
+
+{
+    "refreshToken":""
+}
+
+###
+
+GET http://localhost:8081/buildinfo

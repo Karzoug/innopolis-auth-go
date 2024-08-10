@@ -9,13 +9,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/bogatyr285/auth-go/config"
-	"github.com/bogatyr285/auth-go/internal/auth/repository"
-	"github.com/bogatyr285/auth-go/internal/auth/usecase"
-	"github.com/bogatyr285/auth-go/internal/buildinfo"
-	"github.com/bogatyr285/auth-go/internal/gateway/http/gen"
-	"github.com/bogatyr285/auth-go/internal/pkg/crypto"
-	"github.com/bogatyr285/auth-go/internal/pkg/jwt"
+	"github.com/Karzoug/innopolis-auth-go/config"
+	"github.com/Karzoug/innopolis-auth-go/internal/auth/repository"
+	"github.com/Karzoug/innopolis-auth-go/internal/auth/usecase"
+	"github.com/Karzoug/innopolis-auth-go/internal/buildinfo"
+	"github.com/Karzoug/innopolis-auth-go/internal/gateway/http/gen"
+	"github.com/Karzoug/innopolis-auth-go/internal/pkg/crypto"
+	"github.com/Karzoug/innopolis-auth-go/internal/pkg/jwt"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/spf13/cobra"
@@ -29,8 +29,6 @@ func NewServeCmd() *cobra.Command {
 		Aliases: []string{"s"},
 		Short:   "Start API server",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			log := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
-
 			ctx, cancel := signal.NotifyContext(cmd.Context(), syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
 			defer cancel()
 
@@ -43,28 +41,35 @@ func NewServeCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			// TODO hide creds
-			slog.Info("loaded cfg", slog.Any("cfg", cfg))
+			logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: cfg.LogLevel}))
+			logger.Info("successfully loaded config")
 
-			storage, err := repository.New(cfg.Storage.SQLitePath)
+			ctxStorage, cancel := context.WithTimeout(ctx, time.Second*3)
+			defer cancel()
+			storage, err := repository.New(ctxStorage, cfg.Storage.SQLitePath)
 			if err != nil {
 				return err
 			}
 
 			passwordHasher := crypto.NewPasswordHasher()
-			jwtManager, err := jwt.NewJWTManager(
-				cfg.JWT.Issuer,
-				cfg.JWT.ExpiresIn,
-				[]byte(cfg.JWT.PublicKey),
-				[]byte(cfg.JWT.PrivateKey))
+			jwtManager, err := jwt.NewJWTManager(jwt.Config{
+				Issuer:           cfg.JWT.Issuer,
+				AccessExpiresIn:  cfg.JWT.AccessExpiresIn,
+				RefreshExpiresIn: cfg.JWT.RefreshExpiresIn,
+				PublicKey:        []byte(cfg.JWT.PublicKey),
+				PrivateKey:       []byte(cfg.JWT.PrivateKey),
+			})
 			if err != nil {
 				return err
 			}
 
+			tr := repository.NewRWMap[string, string](cfg.TokenStorage.CleaningInterval)
 			useCase := usecase.NewUseCase(&storage,
+				tr,
 				passwordHasher,
 				jwtManager,
-				buildinfo.New())
+				buildinfo.New(),
+				logger)
 
 			httpServer := http.Server{
 				Addr:         cfg.HTTPServer.Address,
@@ -74,25 +79,25 @@ func NewServeCmd() *cobra.Command {
 			}
 
 			go func() {
-				if err := httpServer.ListenAndServe(); err != nil {
-					log.Error("ListenAndServe", slog.Any("err", err))
+				if err := httpServer.ListenAndServe(); err != http.ErrServerClosed {
+					logger.Error("ListenAndServe", slog.Any("err", err))
 				}
 			}()
-			log.Info("server listening:", slog.Any("port", cfg.HTTPServer.Address))
+			logger.Info("server listening:", slog.String("port", cfg.HTTPServer.Address))
 			<-ctx.Done()
 
 			closeCtx, _ := context.WithTimeout(context.Background(), time.Second*5)
 			if err := httpServer.Shutdown(closeCtx); err != nil {
-				log.Error("httpServer.Shutdown", slog.Any("err", err))
+				logger.Error("httpServer.Shutdown", slog.String("error", err.Error()))
 			}
 
 			if err := storage.Close(); err != nil {
-				log.Error("storage.Close", slog.Any("err", err))
+				logger.Error("storage.Close", slog.String("error", err.Error()))
 			}
 
 			return nil
 		},
 	}
-	c.Flags().StringVar(&configPath, "config", "", "path to config")
+	c.Flags().StringVar(&configPath, "config", "config.yaml", "path to config")
 	return c
 }
