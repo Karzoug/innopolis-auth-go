@@ -1,6 +1,7 @@
 package config
 
 import (
+	"log/slog"
 	"os"
 	"time"
 
@@ -8,9 +9,11 @@ import (
 )
 
 type Config struct {
-	HTTPServer HTTPServer `yaml:"http_server"`
-	Storage    Storage    `yaml:"storage"`
-	JWT        JWT        `yaml:"jwt"`
+	LogLevel     slog.Level   `yaml:"log_level" env-default:"INFO"`
+	HTTPServer   HTTPServer   `yaml:"http_server"`
+	Storage      Storage      `yaml:"storage"`
+	TokenStorage TokenStorage `yaml:"token_storage"`
+	JWT          JWT          `yaml:"jwt"`
 }
 
 type HTTPServer struct {
@@ -19,14 +22,19 @@ type HTTPServer struct {
 }
 
 type Storage struct {
-	SQLitePath string `yaml:"path" env-default:"db.sql"`
+	SQLitePath string `yaml:"path" env-default:"app.db"`
+}
+
+type TokenStorage struct {
+	CleaningInterval time.Duration `yaml:"cleaning_interval" env-default:"10m"`
 }
 
 type JWT struct {
-	Issuer     string        `yaml:"issuer"`
-	ExpiresIn  time.Duration `yaml:"expires_in"`
-	PublicKey  string        `yaml:"public_key"`
-	PrivateKey string        `yaml:"private_key"`
+	Issuer           string        `yaml:"issuer"`
+	AccessExpiresIn  time.Duration `yaml:"access_expires_in"`
+	RefreshExpiresIn time.Duration `yaml:"refresh_expires_in"`
+	PublicKey        string        `yaml:"public_key"`
+	PrivateKey       string        `yaml:"private_key"`
 }
 
 func Parse(s string) (*Config, error) {

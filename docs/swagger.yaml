@@ -27,6 +27,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: User already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '500':
           description: Internal Server Error
           content:
@@ -50,6 +56,41 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/LoginUserResponse'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /refresh:
+    post:
+      summary: Refresh access token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshAccessTokenRequest'
+      responses:
+        '200':
+          description: Token successfully refreshed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefreshAccessTokenResponse'
         '400':
           description: Bad Request
           content:
@@ -114,6 +155,15 @@ components:
       required:
         - username
         - password
+
+    RefreshAccessTokenRequest:
+      type: object
+      properties:
+        refreshToken:
+          type: string
+          description: JWT refresh token of the existing user
+      required:
+        - refreshToken
     
     RegisterUserResponse:
       type: object
@@ -128,14 +178,31 @@ components:
         - id
         - username
 
+    RefreshAccessTokenResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+          description: JWT token for accessing protected routes
+        refreshToken:
+          type: string
+          description: JWT refresh token for refreshing tokens
+      required:
+        - accessToken
+        - refreshToken
+
     LoginUserResponse:
       type: object
       properties:
         accessToken:
           type: string
           description: JWT token for accessing protected routes
+        refreshToken:
+          type: string
+          description: JWT refresh token for refreshing tokens
       required:
         - accessToken
+        - refreshToken
     
     BuildInfo:
       type: object

@@ -3,9 +3,11 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 
-	"github.com/bogatyr285/auth-go/internal/auth/entity"
+	"github.com/Karzoug/innopolis-auth-go/internal/auth/entity"
+	"github.com/mattn/go-sqlite3"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -13,27 +15,23 @@ type SQLLiteStorage struct {
 	db *sql.DB
 }
 
-func New(dbPath string) (SQLLiteStorage, error) {
+func New(ctx context.Context, dbPath string) (SQLLiteStorage, error) {
 	db, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
 		return SQLLiteStorage{}, err
 	}
-	stmt, err := db.Prepare(`
+	_, err = db.ExecContext(ctx, `
 	CREATE TABLE IF NOT EXISTS users (
 		id INTEGER PRIMARY KEY,
-		username text not null,
+		username text not null unique,
 		password text not null,
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
 	create index if not exists idx_username ON users(username);
-	`)
+	`, nil)
 	if err != nil {
-		return SQLLiteStorage{}, fmt.Errorf("db schema init err: %s", err)
+		return SQLLiteStorage{}, fmt.Errorf("db schema init err: %w", err)
 	}
 
-	_, err = stmt.Exec()
-	if err != nil {
-		return SQLLiteStorage{}, err
-	}
 	return SQLLiteStorage{db: db}, nil
 }
 
@@ -42,27 +40,24 @@ func (s *SQLLiteStorage) Close() error {
 }
 
 func (s *SQLLiteStorage) RegisterUser(ctx context.Context, u entity.UserAccount) error {
-	stmt, err := s.db.PrepareContext(ctx, `INSERT INTO users(username, password) VALUES(?,?)`)
-	if err != nil {
-		return err
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO users(username, password) VALUES(?,?)`,
+		u.Username, u.Password)
+	if errors.Is(err, sqlite3.ErrConstraintUnique) {
+		return ErrAlreadyExists
 	}
-
-	if _, err := stmt.Exec(u.Username, u.Password); err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func (s *SQLLiteStorage) FindUserByEmail(ctx context.Context, username string) (entity.UserAccount, error) {
-	stmt, err := s.db.PrepareContext(ctx, `SELECT password FROM users WHERE username = ?`)
-	if err != nil {
-		return entity.UserAccount{}, err
-	}
-
 	var pswdFromDB string
-
-	if err := stmt.QueryRow(username).Scan(&pswdFromDB); err != nil {
+	if err := s.db.QueryRowContext(ctx,
+		`SELECT password FROM users WHERE username = ?`,
+		username).
+		Scan(&pswdFromDB); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return entity.UserAccount{}, ErrRecordNotFound
+		}
 		return entity.UserAccount{}, err
 	}
 

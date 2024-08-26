@@ -4,15 +4,16 @@ import (
 	"context"
 	"log"
 
-	"github.com/bogatyr285/auth-go/cmd/commands"
+	"github.com/Karzoug/innopolis-auth-go/cmd/commands"
 )
 
 func main() {
 	ctx := context.Background()
 
-	cmd := commands.NewServeCmd()
+	commands.RootCmd.AddCommand(commands.NewGenKeysCmd())
+	commands.RootCmd.AddCommand(commands.NewServeCmd())
 
-	if err := cmd.ExecuteContext(ctx); err != nil {
+	if err := commands.RootCmd.ExecuteContext(ctx); err != nil {
 		log.Fatalf("smth went wrong: %s", err)
 	}
 }
