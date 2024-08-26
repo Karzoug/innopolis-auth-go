@@ -79,19 +79,11 @@ func (u AuthUseCase) PostLogin(ctx context.Context, request gen.PostLoginRequest
 		return gen.PostLogin401JSONResponse{Error: "unauthenticated"}, nil
 	}
 
-	accessToken, err := u.jwtManager.IssueAccessToken(user.Username)
+	accessToken, refreshToken, err := u.getTokens(user.Username)
 	if err != nil {
 		u.logger.Error("post login", slog.String("error", err.Error()))
-		return gen.PostLogin500JSONResponse{}, err
+		return gen.PostLogin500JSONResponse{}, nil
 	}
-	refreshToken, err := u.jwtManager.IssueRefreshToken(user.Username)
-	if err != nil {
-		u.logger.Error("post login", slog.String("error", err.Error()))
-		return gen.PostLogin500JSONResponse{}, err
-	}
-
-	// we use only one refresh token, so we just replace the old one or create a new one
-	u.tokenRepo.Set(user.Username, getTokenSignature(refreshToken), u.jwtManager.RefreshExpiresDuration())
 
 	return gen.PostLogin200JSONResponse{
 		AccessToken:  accessToken,
@@ -138,14 +130,14 @@ func (u AuthUseCase) PostRefresh(ctx context.Context, request gen.PostRefreshReq
 		return gen.PostRefresh401JSONResponse{Error: "unauthenticated"}, nil
 	}
 
-	accessToken, err := u.jwtManager.IssueAccessToken(username)
+	accessToken, refreshToken, err := u.getTokens(username)
 	if err != nil {
-		u.logger.Error("post refresh", slog.String("error", err.Error()))
-		return gen.PostRefresh500JSONResponse{}, err
+		return gen.PostRefresh500JSONResponse{}, nil
 	}
 
 	return gen.PostRefresh200JSONResponse{
-		AccessToken: accessToken,
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
 	}, nil
 }
 
@@ -163,4 +155,20 @@ func (u AuthUseCase) GetBuildinfo(ctx context.Context, request gen.GetBuildinfoR
 
 func getTokenSignature(token string) string {
 	return token[strings.LastIndexByte(token, '.')+1:]
+}
+
+func (u AuthUseCase) getTokens(username string) (string, string, error) {
+	at, err := u.jwtManager.IssueAccessToken(username)
+	if err != nil {
+		return "", "", err
+	}
+	rt, err := u.jwtManager.IssueRefreshToken(username)
+	if err != nil {
+		return "", "", err
+	}
+
+	// we use only one refresh token, so we just replace the old one or create a new one
+	u.tokenRepo.Set(username, getTokenSignature(rt), u.jwtManager.RefreshExpiresDuration())
+
+	return at, rt, nil
 }

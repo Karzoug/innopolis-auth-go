@@ -183,9 +183,13 @@ components:
       properties:
         accessToken:
           type: string
-          description: JWT access token for accessing protected routes
+          description: JWT token for accessing protected routes
+        refreshToken:
+          type: string
+          description: JWT refresh token for refreshing tokens
       required:
         - accessToken
+        - refreshToken
 
     LoginUserResponse:
       type: object

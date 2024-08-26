@@ -59,8 +59,11 @@ type RefreshAccessTokenRequest struct {
 
 // RefreshAccessTokenResponse defines model for RefreshAccessTokenResponse.
 type RefreshAccessTokenResponse struct {
-	// AccessToken JWT access token for accessing protected routes
+	// AccessToken JWT token for accessing protected routes
 	AccessToken string `json:"accessToken"`
+
+	// RefreshToken JWT refresh token for refreshing tokens
+	RefreshToken string `json:"refreshToken"`
 }
 
 // RegisterUserRequest defines model for RegisterUserRequest.
