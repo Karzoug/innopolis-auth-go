@@ -8,7 +8,6 @@ import (
 
 	"github.com/Karzoug/innopolis-auth-go/internal/auth/entity"
 	"github.com/mattn/go-sqlite3"
-	_ "github.com/mattn/go-sqlite3"
 )
 
 type SQLLiteStorage struct {
@@ -42,8 +41,9 @@ func (s *SQLLiteStorage) Close() error {
 func (s *SQLLiteStorage) RegisterUser(ctx context.Context, u entity.UserAccount) error {
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO users(username, password) VALUES(?,?)`,
-		u.Username, u.Password)
-	if errors.Is(err, sqlite3.ErrConstraintUnique) {
+		u.Username, u.HashedPassword)
+	var serr sqlite3.Error
+	if errors.As(err, &serr) && serr.ExtendedCode == sqlite3.ErrConstraintUnique {
 		return ErrAlreadyExists
 	}
 	return err
@@ -62,7 +62,7 @@ func (s *SQLLiteStorage) FindUserByEmail(ctx context.Context, username string) (
 	}
 
 	return entity.UserAccount{
-		Username: username,
-		Password: pswdFromDB,
+		Username:       username,
+		HashedPassword: pswdFromDB,
 	}, nil
 }
