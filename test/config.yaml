@@ -5,7 +5,11 @@ storage:
   path: ":memory:"
 jwt:
   issuer: auth-service
-  access_expires_in: 5m
-  refresh_expires_in: 24h
+  # time here should be not small 
+  # otherwise tokens will be expired,
+  # and not big
+  # otherwise tests take too long
+  access_expires_in: 1s
+  refresh_expires_in: 1s
   public_key: testdir/jwtRS256.key.pub   
   private_key: testdir/jwtRS256.key

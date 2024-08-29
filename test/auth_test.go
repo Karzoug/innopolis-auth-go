@@ -209,7 +209,7 @@ func (s *authSuite) TestRegisterUser() {
 	}
 }
 
-func (s *authSuite) TestRegisterLoginUser() {
+func (s *authSuite) TestLoginUser() {
 	// register one user to test login
 	const (
 		password = "rLymjiwosegnwern"
@@ -277,6 +277,77 @@ func (s *authSuite) TestRegisterLoginUser() {
 
 			_, err = s.jwtManager.VerifyToken(res.AccessToken)
 			s.Require().NoError(err)
+			_, err = s.jwtManager.VerifyToken(res.RefreshToken)
+			s.Require().NoError(err)
 		})
 	}
+}
+
+func (s *authSuite) TestRefreshUser() {
+	// register one user to test login
+	const (
+		password = "rLymjiwosegnwern"
+		email    = "user@example.com"
+	)
+	resp, err := s.client.R().
+		SetBody(gen.RegisterUserRequest{
+			Password: password,
+			Username: email,
+		}).
+		SetResult(&gen.RegisterUserResponse{}).
+		SetError(&gen.ErrorResponse{}).
+		Post(s.httpAddress + "/register")
+
+	s.Require().NoError(err)
+	s.Require().Equal(http.StatusCreated, resp.StatusCode(), resp.Error())
+	s.Require().Equal(email, resp.Result().(*gen.RegisterUserResponse).Username)
+
+	// get tokens
+	resp, err = s.client.R().
+		SetBody(gen.LoginUserRequest{
+			Password: password,
+			Username: email,
+		}).
+		SetResult(&gen.LoginUserResponse{}).
+		SetError(&gen.ErrorResponse{}).
+		Post(s.httpAddress + "/login")
+
+	s.Require().NoError(err)
+	s.Require().Equal(http.StatusOK, resp.StatusCode(), resp.Error())
+	res := resp.Result().(*gen.LoginUserResponse)
+
+	rt := res.RefreshToken
+
+	// try refresh tokens
+	resp, err = s.client.R().
+		SetBody(gen.RefreshAccessTokenRequest{
+			RefreshToken: rt,
+		}).
+		SetResult(&gen.RefreshAccessTokenResponse{}).
+		SetError(&gen.ErrorResponse{}).
+		Post(s.httpAddress + "/refresh")
+
+	s.Require().NoError(err)
+	s.Require().Equal(http.StatusOK, resp.StatusCode(), resp.Error())
+
+	newAT := resp.Result().(*gen.RefreshAccessTokenResponse).AccessToken
+	_, err = s.jwtManager.VerifyToken(newAT)
+	s.Require().NoError(err)
+	newRT := resp.Result().(*gen.RefreshAccessTokenResponse).RefreshToken
+	_, err = s.jwtManager.VerifyToken(newRT)
+	s.Require().NoError(err)
+
+	// wait for refresh token to expire
+	time.Sleep(s.cfg.JWT.RefreshExpiresIn)
+	// and try refresh tokens again
+	resp, err = s.client.R().
+		SetBody(gen.RefreshAccessTokenRequest{
+			RefreshToken: rt,
+		}).
+		SetResult(&gen.RefreshAccessTokenResponse{}).
+		SetError(&gen.ErrorResponse{}).
+		Post(s.httpAddress + "/refresh")
+
+	s.Require().NoError(err)
+	s.Require().Equal(http.StatusUnauthorized, resp.StatusCode(), resp.Error())
 }
