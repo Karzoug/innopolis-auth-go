@@ -136,9 +136,13 @@ components:
         username:
           type: string
           description: Username of the new user
+          x-oapi-codegen-extra-tags:
+            validate: "required,email"
         password:
           type: string
           description: Password of the new user
+          x-oapi-codegen-extra-tags:
+            validate: "required,min=8"
       required:
         - username
         - password
@@ -149,9 +153,13 @@ components:
         username:
           type: string
           description: Username of the existing user
+          x-oapi-codegen-extra-tags:
+            validate: "required,email"
         password:
           type: string
           description: Password of the existing user
+          x-oapi-codegen-extra-tags:
+            validate: "required,min=8"
       required:
         - username
         - password

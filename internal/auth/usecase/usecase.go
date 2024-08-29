@@ -14,22 +14,26 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+//go:generate mockgen -source=usecase.go -destination=./../mocks/usecase_mock.go -package mock
 type UserRepository interface {
 	RegisterUser(ctx context.Context, u entity.UserAccount) error
 	FindUserByEmail(ctx context.Context, username string) (entity.UserAccount, error)
 }
 
+//go:generate mockgen -source=usecase.go -destination=./../mocks/usecase_mock.go -package mock
 type TokenRepository interface {
 	Get(key string) (string, bool)
 	Set(key string, value string, duration time.Duration)
 	Delete(key string)
 }
 
+//go:generate mockgen -source=usecase.go -destination=./../mocks/usecase_mock.go -package mock
 type CryptoPassword interface {
 	HashPassword(password string) ([]byte, error)
 	ComparePasswords(fromUser, fromDB string) bool
 }
 
+//go:generate mockgen -source=usecase.go -destination=./../mocks/usecase_mock.go -package mock
 type JWTManager interface {
 	RefreshExpiresDuration() time.Duration
 	IssueAccessToken(userID string) (string, error)
@@ -66,6 +70,12 @@ func NewUseCase(
 }
 
 func (u AuthUseCase) PostLogin(ctx context.Context, request gen.PostLoginRequestObject) (gen.PostLoginResponseObject, error) {
+	if err := validate.Struct(request.Body); err != nil {
+		return gen.PostLogin400JSONResponse{
+			Error: validatorErrorText(err),
+		}, nil
+	}
+
 	user, err := u.userRepo.FindUserByEmail(ctx, request.Body.Username)
 	if err != nil {
 		if errors.Is(err, repository.ErrRecordNotFound) {
@@ -75,7 +85,7 @@ func (u AuthUseCase) PostLogin(ctx context.Context, request gen.PostLoginRequest
 		return gen.PostLogin500JSONResponse{}, nil
 	}
 
-	if !u.cryptoPassword.ComparePasswords(user.Password, request.Body.Password) {
+	if !u.cryptoPassword.ComparePasswords(user.HashedPassword, request.Body.Password) {
 		return gen.PostLogin401JSONResponse{Error: "unauthenticated"}, nil
 	}
 
@@ -92,6 +102,12 @@ func (u AuthUseCase) PostLogin(ctx context.Context, request gen.PostLoginRequest
 }
 
 func (u AuthUseCase) PostRegister(ctx context.Context, request gen.PostRegisterRequestObject) (gen.PostRegisterResponseObject, error) {
+	if err := validate.Struct(request.Body); err != nil {
+		return gen.PostRegister400JSONResponse{
+			Error: validatorErrorText(err),
+		}, nil
+	}
+
 	hashedPassword, err := u.cryptoPassword.HashPassword(request.Body.Password)
 	if err != nil {
 		u.logger.Error("post register", slog.String("error", err.Error()))
@@ -109,7 +125,7 @@ func (u AuthUseCase) PostRegister(ctx context.Context, request gen.PostRegisterR
 			return gen.PostRegister409JSONResponse{Error: "user already exists"}, nil
 		}
 		u.logger.Warn("post register", slog.String("error", err.Error()))
-		return gen.PostRegister500JSONResponse{}, nil
+		return gen.PostRegister500JSONResponse{Error: err.Error()}, nil
 	}
 	return gen.PostRegister201JSONResponse{
 		Username: request.Body.Username,

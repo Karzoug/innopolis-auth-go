@@ -13,11 +13,9 @@ import (
 	"github.com/Karzoug/innopolis-auth-go/internal/auth/repository"
 	"github.com/Karzoug/innopolis-auth-go/internal/auth/usecase"
 	"github.com/Karzoug/innopolis-auth-go/internal/buildinfo"
-	"github.com/Karzoug/innopolis-auth-go/internal/gateway/http/gen"
+	gwHttp "github.com/Karzoug/innopolis-auth-go/internal/gateway/http"
 	"github.com/Karzoug/innopolis-auth-go/internal/pkg/crypto"
 	"github.com/Karzoug/innopolis-auth-go/internal/pkg/jwt"
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
 	"github.com/spf13/cobra"
 )
 
@@ -31,11 +29,6 @@ func NewServeCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx, cancel := signal.NotifyContext(cmd.Context(), syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
 			defer cancel()
-
-			router := chi.NewRouter()
-			router.Use(middleware.Logger)
-			router.Use(middleware.RequestID)
-			router.Use(middleware.Recoverer)
 
 			cfg, err := config.Parse(configPath)
 			if err != nil {
@@ -71,12 +64,7 @@ func NewServeCmd() *cobra.Command {
 				buildinfo.New(),
 				logger)
 
-			httpServer := http.Server{
-				Addr:         cfg.HTTPServer.Address,
-				ReadTimeout:  cfg.HTTPServer.Timeout,
-				WriteTimeout: cfg.HTTPServer.Timeout,
-				Handler:      gen.HandlerFromMux(gen.NewStrictHandler(useCase, nil), router),
-			}
+			httpServer := gwHttp.NewAuthServer(cfg.HTTPServer, useCase)
 
 			go func() {
 				if err := httpServer.ListenAndServe(); err != http.ErrServerClosed {

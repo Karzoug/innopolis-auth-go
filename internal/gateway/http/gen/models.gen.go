@@ -36,10 +36,10 @@ type ErrorResponse struct {
 // LoginUserRequest defines model for LoginUserRequest.
 type LoginUserRequest struct {
 	// Password Password of the existing user
-	Password string `json:"password"`
+	Password string `json:"password" validate:"required,min=8"`
 
 	// Username Username of the existing user
-	Username string `json:"username"`
+	Username string `json:"username" validate:"required,email"`
 }
 
 // LoginUserResponse defines model for LoginUserResponse.
@@ -69,10 +69,10 @@ type RefreshAccessTokenResponse struct {
 // RegisterUserRequest defines model for RegisterUserRequest.
 type RegisterUserRequest struct {
 	// Password Password of the new user
-	Password string `json:"password"`
+	Password string `json:"password" validate:"required,min=8"`
 
 	// Username Username of the new user
-	Username string `json:"username"`
+	Username string `json:"username" validate:"required,email"`
 }
 
 // RegisterUserResponse defines model for RegisterUserResponse.
