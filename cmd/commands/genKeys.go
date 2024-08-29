@@ -19,15 +19,15 @@ func NewGenKeysCmd() *cobra.Command {
 		Aliases: []string{"gk"},
 		Short:   "Generate pem formatted ed25519 keys",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return generateAndSaveKeys(keyFilename)
+			return GenerateAndSaveKeys(keyFilename)
 		},
 	}
 	c.Flags().StringVar(&keyFilename, "file", "jwtRS256.key", "key file name")
 	return c
 }
 
-// generateAndSaveKeys generates and saves ed25519 keys to disk after encoding into PEM format
-func generateAndSaveKeys(keyFilename string) error {
+// GenerateAndSaveKeys generates and saves ed25519 keys to disk after encoding into PEM format
+func GenerateAndSaveKeys(keyFilename string) error {
 	var (
 		err   error
 		b     []byte
